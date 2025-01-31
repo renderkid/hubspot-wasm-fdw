@@ -201,7 +201,7 @@ impl Guest for HubspotFdw {
                 tgt_col.type_oid()
             ))?;
 
-            row.push(cell);
+            row.push(Some(&cell));
         }
 
         this.src_idx += 1;
