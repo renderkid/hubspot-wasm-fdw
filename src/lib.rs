@@ -131,7 +131,7 @@ impl Guest for HubspotFdw {
         Ok(())
     }
 
-    fn iter_scan(ctx: &Context, row: &Row) -> Result<Option<u32>, FdwError> {
+    fn iter_scan(ctx: &Context, row: &mut Row) -> Result<Option<u32>, FdwError> {
         let this = Self::this_mut();
 
         if this.src_idx >= this.src_rows.len() {
@@ -181,21 +181,27 @@ impl Guest for HubspotFdw {
             let cell = match tgt_col.type_oid() {
                 TypeOid::Bool => src_value.as_bool().map(Cell::Bool),
                 TypeOid::String => src_value.as_str().map(|v| Cell::String(v.to_owned())),
-                TypeOid::Int64 => src_value.as_i64().map(Cell::Int64),
-                TypeOid::Float64 => src_value.as_f64().map(Cell::Float64),
                 TypeOid::Timestamp => {
                     src_value.as_str().and_then(|v| {
-                        time::parse_rfc3339(v).ok().map(|ts| Cell::Timestamp(ts))
+                        time::parse_from_rfc3339(v).ok().map(Cell::Timestamp)
                     })
                 }
-                _ => None,
+                TypeOid::Json => Some(Cell::Json(src_value.to_string())),
+                _ => {
+                    // Handle numeric values by converting them to strings
+                    if src_value.is_number() {
+                        Some(Cell::String(src_value.to_string()))
+                    } else {
+                        None
+                    }
+                }
             }.ok_or(format!(
                 "cannot convert column '{}' to type {:?}",
                 tgt_col_name,
                 tgt_col.type_oid()
             ))?;
 
-            row.set_cell(tgt_col.index(), cell)?;
+            row.push(cell);
         }
 
         this.src_idx += 1;
