@@ -131,7 +131,7 @@ impl Guest for HubspotFdw {
         Ok(())
     }
 
-    fn iter_scan(ctx: &Context, row: &mut Row) -> Result<Option<u32>, FdwError> {
+    fn iter_scan(ctx: &Context, row: &Row) -> Result<Option<u32>, FdwError> {
         let this = Self::this_mut();
 
         if this.src_idx >= this.src_rows.len() {
