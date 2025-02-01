@@ -13,3 +13,4 @@ target/
 cmake*/
 .direnv
 src/bindings.rs
+.env.local
