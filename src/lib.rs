@@ -184,7 +184,7 @@ impl Guest for HubspotFdw {
                 TypeOid::String => src_value.as_str().map(|v| Cell::String(v.to_owned())),
                 TypeOid::Timestamp => {
                     if src_value.is_null() {
-                        Some(Cell::Null)
+                        None
                     } else {
                         src_value.as_str().and_then(|v| {
                             time::parse_from_rfc3339(v).ok().map(Cell::Timestamp)
