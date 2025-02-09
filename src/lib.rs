@@ -51,10 +51,10 @@ impl HubspotFdw {
     }
 
     fn fetch_data(&mut self, object: &str) -> Result<(), String> {
-        let endpoint = match object {
-            "contacts" => "/crm/v3/objects/contacts",
-            "companies" => "/crm/v3/objects/companies",
-            "deals" => "/crm/v3/objects/deals",
+        let (endpoint, properties) = match object {
+            "contacts" => ("/crm/v3/objects/contacts", "firstName,lastName,email,phone"),
+            "companies" => ("/crm/v3/objects/companies", "name,domain,industry,city,phone"),
+            "deals" => ("/crm/v3/objects/deals", "amount,closedstage,dealname,closedate"),
             _ => return Err(format!("Unsupported object type: {}", object)),
         };
 
@@ -62,6 +62,7 @@ impl HubspotFdw {
         
         // Add query parameters
         url.push_str("?limit=100");
+        url.push_str(&format!("&properties={}", properties));
         if let Some(after) = &self.after {
             url.push_str(&format!("&after={}", after));
         }
@@ -182,9 +183,13 @@ impl Guest for HubspotFdw {
                 TypeOid::Bool => src_value.as_bool().map(Cell::Bool),
                 TypeOid::String => src_value.as_str().map(|v| Cell::String(v.to_owned())),
                 TypeOid::Timestamp => {
-                    src_value.as_str().and_then(|v| {
-                        time::parse_from_rfc3339(v).ok().map(Cell::Timestamp)
-                    })
+                    if src_value.is_null() {
+                        Some(Cell::Null)
+                    } else {
+                        src_value.as_str().and_then(|v| {
+                            time::parse_from_rfc3339(v).ok().map(Cell::Timestamp)
+                        })
+                    }
                 }
                 TypeOid::Json => Some(Cell::Json(src_value.to_string())),
                 _ => {
