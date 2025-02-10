@@ -1,4 +1,4 @@
-package renderkid:hubspot-wasm-fdw@0.3.1;
+package renderkid:hubspot-wasm-fdw@0.3.2;
 
 world example {
     import supabase:wrappers/http@0.1.0;

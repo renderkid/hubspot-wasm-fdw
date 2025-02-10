@@ -54,12 +54,12 @@ impl HubspotFdw {
         let (endpoint, properties) = match object {
             "contacts" => ("/crm/v3/objects/contacts", "firstName,lastName,email,phone"),
             "companies" => ("/crm/v3/objects/companies", "name,domain,industry,city,phone"),
-            "deals" => ("/crm/v3/objects/deals", "amount,closedstage,dealname,closedate"),
+            "deals" => ("/crm/v3/objects/deals", "amount,dealstage,dealname,closedate"),
             _ => return Err(format!("Unsupported object type: {}", object)),
         };
 
         let mut url = format!("{}{}", self.base_url, endpoint);
-        
+
         // Add query parameters
         url.push_str("?limit=100");
         url.push_str(&format!("&properties={}", properties));
@@ -125,7 +125,7 @@ impl Guest for HubspotFdw {
 
         let opts = ctx.get_options(OptionsType::Table);
         let object = opts.require("object")?;
-        
+
         this.fetch_data(&object)?;
         utils::report_info(&format!("Initial fetch complete. Row count: {}", this.src_rows.len()));
 
@@ -154,7 +154,7 @@ impl Guest for HubspotFdw {
         let src_row = &this.src_rows[this.src_idx];
         for tgt_col in ctx.get_columns() {
             let tgt_col_name = tgt_col.name();
-            
+
             // Handle nested properties
             let src_value = if tgt_col_name.contains(".") {
                 let parts: Vec<&str> = tgt_col_name.split('.').collect();
@@ -180,8 +180,20 @@ impl Guest for HubspotFdw {
             };
 
             let cell = match tgt_col.type_oid() {
-                TypeOid::Bool => src_value.as_bool().map(Cell::Bool),
-                TypeOid::String => src_value.as_str().map(|v| Cell::String(v.to_owned())),
+                TypeOid::Bool => {
+                    if src_value.is_null() {
+                        None
+                    } else {
+                        src_value.as_bool().map(Cell::Bool)
+                    }
+                }
+                TypeOid::String => {
+                    if src_value.is_null() {
+                        None
+                    } else {
+                        src_value.as_str().map(|v| Cell::String(v.to_owned()))
+                    }
+                }
                 TypeOid::Timestamp => {
                     if src_value.is_null() {
                         None
@@ -191,10 +203,18 @@ impl Guest for HubspotFdw {
                         })
                     }
                 }
-                TypeOid::Json => Some(Cell::Json(src_value.to_string())),
+                TypeOid::Json => {
+                    if src_value.is_null() {
+                        None
+                    } else {
+                        Some(Cell::Json(src_value.to_string()))
+                    }
+                }
                 _ => {
                     // Handle numeric values by converting them to strings
-                    if src_value.is_number() {
+                    if src_value.is_null() {
+                        None
+                    } else if src_value.is_number() {
                         Some(Cell::String(src_value.to_string()))
                     } else {
                         None
